@@ -1,0 +1,56 @@
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:17-alpine
+    container_name: chess_api_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chess_api
+      POSTGRES_USER: chess_user
+      POSTGRES_PASSWORD: chess_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - chess_network
+
+  # Interface d'administration PostgreSQL (optionnel)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: chess_api_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@chess-api.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - chess_network
+
+  # Redis pour les sessions/cache (optionnel)
+  redis:
+    image: redis:7-alpine
+    container_name: chess_api_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - chess_network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  redis_data:
+
+networks:
+  chess_network:
+    driver: bridge
