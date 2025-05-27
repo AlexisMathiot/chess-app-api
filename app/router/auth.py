@@ -1,26 +1,24 @@
-from fastapi import APIRouter, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from typing_extensions import Annotated
 from passlib.context import CryptContext
 from starlette import status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserResponse
 from app.db.models.user import User
+from app.core.security import (
+    verify_password,
+    create_access_token,
+    get_current_active_user,
+)
 
 router = APIRouter()
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 db_dependency = Annotated[Session, Depends(get_db)]
-
-
-@router.get("/items/")
-async def read_items(token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": token}
 
 
 @router.post("/auth", status_code=status.HTTP_201_CREATED)
@@ -40,4 +38,26 @@ async def create_user(
 
     db.add(user_create_model)
     db.commit()
-    return user_create_model
+
+
+@router.post("/token")
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    access_token = create_access_token(data={"sub": user.email})
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/users/me/", response_model=UserResponse)
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    return current_user
