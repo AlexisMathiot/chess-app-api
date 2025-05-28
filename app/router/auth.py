@@ -1,18 +1,18 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from typing_extensions import Annotated
 from passlib.context import CryptContext
-from starlette import status
 from sqlalchemy.orm import Session
+from starlette import status
 
-from app.db.database import get_db
-from app.schemas.user import UserCreate, UserResponse
-from app.db.models.user import User
 from app.core.security import (
-    verify_password,
     create_access_token,
-    get_current_active_user,
+    verify_password,
 )
+from app.db.database import get_db
+from app.db.models.user import User
+from app.schemas.user import UserCreate
 
 router = APIRouter()
 
@@ -42,7 +42,8 @@ async def create_user(
 
 @router.post("/token")
 async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: db_dependency,
 ):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user:
@@ -54,10 +55,3 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": user.email})
 
     return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.get("/users/me/", response_model=UserResponse)
-async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    return current_user

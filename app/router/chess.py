@@ -1,12 +1,12 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
-from fastapi.responses import JSONResponse
-import chess
-import chess.engine
-import subprocess
 import asyncio
 import logging
+import subprocess
 
+import chess
+import chess.engine
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -53,6 +53,7 @@ async def check_stockfish():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=2,
+            check=False,
         )
         return {
             "stdout": result.stdout.decode(),
@@ -100,12 +101,12 @@ async def websocket_analyze(websocket: WebSocket):
 
                     await asyncio.sleep(0.5)
             except Exception as analysis_err:
-                logging.error(f"Error during analysis: {analysis_err}")
+                logging.exception(f"Error during analysis: {analysis_err}")
                 await websocket.send_json({"error": "Analysis failed"})
     except WebSocketDisconnect:
         logging.info("WebSocket disconnected")
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logging.exception(f"Fatal error: {e}")
     finally:
         if engine:
             engine.quit()

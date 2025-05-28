@@ -1,5 +1,7 @@
 import asyncio
+
 import websockets
+
 
 async def test():
     uri = "ws://localhost:8000/ws/analyze"
@@ -9,5 +11,6 @@ async def test():
         while True:
             response = await websocket.recv()
             print(response)
+
 
 asyncio.run(test())

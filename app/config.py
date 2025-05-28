@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Optional
-from pydantic import field_validator, computed_field
+
+from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings as PydanticBaseSettings
 
 
@@ -49,7 +50,7 @@ class Settings(PydanticBaseSettings):
     }
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
     Cache des settings pour éviter de relire le .env à chaque fois

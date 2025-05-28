@@ -1,0 +1,216 @@
+# pyproject.toml - Configuration complète pour FastAPI
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "your-fastapi-app"
+version = "0.1.0"
+description = "Your FastAPI application"
+requires-python = ">=3.11"
+
+# ==================== BLACK ====================
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # Dossiers à ignorer
+  \.git
+  | \.venv
+  | \.env
+  | __pycache__
+  | \.pytest_cache
+  | migrations
+  | alembic
+)/
+'''
+
+# ==================== ISORT ====================
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["app"]
+known_third_party = ["fastapi", "pydantic", "sqlalchemy", "pytest"]
+sections = [
+    "FUTURE",
+    "STDLIB", 
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER"
+]
+skip_glob = [
+    "*/migrations/*",
+    "*/alembic/*",
+    "*/__pycache__/*"
+]
+
+# ==================== RUFF ====================
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    ".env",
+    "migrations",
+    "alembic"
+]
+
+[tool.ruff.lint]
+# Règles activées
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "N",   # pep8-naming
+    "S",   # flake8-bandit (sécurité)
+    "BLE", # flake8-blind-except
+    "FBT", # flake8-boolean-trap
+    "A",   # flake8-builtins
+    "COM", # flake8-commas
+    "C90", # mccabe complexity
+    "DJ",  # flake8-django (si vous utilisez Django)
+    "EM",  # flake8-errmsg
+    "G",   # flake8-logging-format
+    "INP", # flake8-no-pep420
+    "PIE", # flake8-pie
+    "T20", # flake8-print
+    "PYI", # flake8-pyi
+    "Q",   # flake8-quotes
+    "RSE", # flake8-raise
+    "RET", # flake8-return
+    "TID", # flake8-tidy-imports
+    "TCH", # flake8-type-checking
+    "ARG", # flake8-unused-arguments
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PL",  # pylint
+    "TRY", # tryceratops
+    "RUF", # ruff-specific rules
+]
+
+# Règles ignorées (ajustez selon vos besoins)
+ignore = [
+    "E501",   # line too long (géré par black)
+    "S101",   # use of assert (OK dans les tests)
+    "S104",   # hardcoded bind all interfaces (OK pour dev)
+    "B008",   # function calls in argument defaults (FastAPI Depends)
+    "RUF012", # mutable class attributes (Pydantic models)
+    "UP007",  # Use X | Y for type annotations (peut casser avec Python < 3.10)
+]
+
+# Ignorer certaines règles dans certains fichiers
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101",   # assert statements OK dans les tests
+    "ARG",    # unused arguments OK dans les fixtures
+    "FBT",    # boolean arguments OK dans les tests
+]
+"migrations/*" = ["ALL"]  # Ignorer toutes les règles dans les migrations
+"alembic/*" = ["ALL"]
+
+# Configuration pour flake8-quotes
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+# Configuration pour mccabe (complexité)
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+# ==================== MYPY ====================
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+no_implicit_reexport = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+# Dossiers à analyser
+files = ["app", "tests"]
+
+# Dossiers à ignorer
+exclude = [
+    "migrations/",
+    "alembic/",
+    "__pycache__/",
+    ".venv/",
+]
+
+# Configuration pour des modules spécifiques
+[[tool.mypy.overrides]]
+module = [
+    "sqlalchemy.*",
+    "alembic.*",
+    "pytest.*",
+    "httpx.*",
+]
+ignore_missing_imports = true
+
+# Plus permissif pour les tests
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# ==================== PYTEST ====================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# ==================== COVERAGE ====================
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/alembic/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/env/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

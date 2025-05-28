@@ -1,0 +1,48 @@
+# Makefile - Commandes pratiques
+.PHONY: format lint type-check test quality install
+
+# Installation des dépendances
+install:
+	pip install -e .
+	pip install black isort ruff mypy pytest pre-commit
+	pre-commit install
+
+# Formatage du code
+format:
+	@echo "🎨 Formatage avec Black..."
+	black .
+	@echo "📦 Tri des imports avec isort..."
+	isort .
+
+# Linting
+lint:
+	@echo "🔍 Analyse avec Ruff..."
+	ruff check . --fix
+
+# Vérification de types
+type-check:
+	@echo "🔍 Vérification des types avec mypy..."
+	mypy .
+
+# Tests
+test:
+	@echo "🧪 Exécution des tests..."
+	pytest
+
+# Vérification complète de la qualité
+quality: format lint type-check
+	@echo "✅ Vérification de la qualité terminée!"
+
+# Vérification avant commit (sans modification)
+check:
+	@echo "🔍 Vérification sans modification..."
+	black --check .
+	isort --check-only .
+	ruff check .
+	mypy .
+
+# Nettoyage
+clean:
+	find . -type d -name __pycache__ -delete
+	find . -type f -name "*.pyc" -delete
+	find . -type d -name "*.egg-info" -exec rm -rf {} +
