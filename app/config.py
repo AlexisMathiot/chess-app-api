@@ -27,7 +27,7 @@ class Settings(PydanticBaseSettings):
     redis_url: Optional[str] = None
 
     # CORS
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8080"]
+    allowed_origins: list = ["http://localhost:5173", "http://localhost:8080"]
 
     # Validation
     @field_validator("environment")
