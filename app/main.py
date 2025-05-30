@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 
-from .router import auth, chess, users
+from .router import auth, chess, users, chess_import
 
 app = FastAPI(
     title=settings.app_name,
@@ -22,3 +22,4 @@ app.add_middleware(
 app.include_router(chess.router, tags=["chess"])
 app.include_router(auth.router, tags=["auth"])
 app.include_router(users.router, tags=["users"])
+app.include_router(chess_import.router, tags=["chess_import"])

@@ -22,7 +22,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(100), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
 
     # Informations utilisateur
     first_name = Column(String(100), nullable=True)
@@ -39,19 +39,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relations - Parties jouées avec les pièces blanches
-    games_as_white = relationship(
-        "ChessGame",
-        back_populates="white_player",
-        foreign_keys="ChessGame.white_player_id",
-    )
-
-    # Relations - Parties jouées avec les pièces noires
-    games_as_black = relationship(
-        "ChessGame",
-        back_populates="black_player",
-        foreign_keys="ChessGame.black_player_id",
-    )
+    imported_games = relationship("ChessGame", back_populates="owner")
 
     @property
     def all_games(self):

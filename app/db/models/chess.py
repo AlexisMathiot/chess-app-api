@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
+from .player_profil import PlayerProfile
 
 
 class ChessGame(Base):
@@ -26,17 +27,14 @@ class ChessGame(Base):
     chess_com_url = Column(Text, nullable=True)
     lichess_url = Column(Text, nullable=True)
 
-    # Relations avec les joueurs
-    white_player_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    black_player_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    white_player_id = Column(Integer, ForeignKey("player_profiles.id"), nullable=False)
+    black_player_id = Column(Integer, ForeignKey("player_profiles.id"), nullable=False)
 
-    # Relations
-    white_player = relationship(
-        "User", back_populates="games_as_white", foreign_keys=[white_player_id]
-    )
-    black_player = relationship(
-        "User", back_populates="games_as_black", foreign_keys=[black_player_id]
-    )
+    white_player = relationship("PlayerProfile", foreign_keys=[white_player_id])
+    black_player = relationship("PlayerProfile", foreign_keys=[black_player_id])
+
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner = relationship("User", back_populates="imported_games")
 
     # Informations sur la partie
     game_date = Column(DateTime(timezone=True), nullable=False)
@@ -45,10 +43,6 @@ class ChessGame(Base):
     rules = Column(String(50), default="chess")
     rated = Column(Boolean, default=True)
     tournament_name = Column(String(200), nullable=True)
-
-    # Ratings au moment de la partie
-    white_player_rating = Column(Integer, nullable=True)
-    black_player_rating = Column(Integer, nullable=True)
 
     # Résultat
     result = Column(String(10), nullable=False)  # "1-0", "0-1", "1/2-1/2"
