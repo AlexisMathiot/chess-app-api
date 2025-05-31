@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 
-from .router import auth, chess, users, chess_import
+from .router import auth, chess, chess_import, users
 
 app = FastAPI(
     title=settings.app_name,

@@ -1,15 +1,13 @@
-import asyncio
+import json
+from datetime import UTC, datetime
+from typing import Optional
+
 import aiohttp
 import chess.pgn
-import json
-from datetime import datetime, timezone
-from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 
-from app.db.models.chess import ChessGame, GamePosition
-from app.db.models.user import User
+from app.db.models.chess import ChessGame
 from app.db.models.player_profil import PlayerProfile
-from app.db.database import get_db
 
 
 class ChessImportService:
@@ -24,30 +22,27 @@ class ChessImportService:
         platform: str = "chess.com",
         username: str = None,
         months_back: int = 3,
-    ) -> Dict:
+    ) -> dict:
         """
         Importe les parties d'un utilisateur depuis une plateforme
         """
-        print(
-            f"Début import pour user_id={user_id}, platform={platform}, username={username}"
-        )
 
         if platform == "chess.com":
             return await self._import_chess_com_games(user_id, username, months_back)
-        elif platform == "lichess":
+        if platform == "lichess":
             return await self._import_lichess_games(user_id, username, months_back)
-        else:
-            raise ValueError(f"Plateforme non supportée: {platform}")
+        raise ValueError(f"Plateforme non supportée: {platform}")
 
     async def _import_chess_com_games(
-        self, user_id: int, username: str, months_back: int
+        self,
+        user_id: int,
+        username: str,
+        months_back: int,
     ) -> dict:
         """Import depuis Chess.com"""
         imported = 0
         skipped = 0
         errors = []
-
-        print(f"Import Chess.com pour {username}, {months_back} mois")
 
         async with aiohttp.ClientSession() as session:
             # Récupérer les parties des derniers mois
@@ -63,56 +58,39 @@ class ChessImportService:
 
                 try:
                     url = f"{self.chess_com_api}/player/{username}/games/{year}/{month:02d}"
-                    print(f"Requête API: {url}")
 
                     async with session.get(url) as response:
-                        print(f"Status response: {response.status}")
-
                         if response.status == 200:
                             data = await response.json()
                             games = data.get("games", [])
-                            print(
-                                f"Nombre de parties trouvées pour {year}/{month}: {len(games)}"
-                            )
 
                             for game_data in games:
                                 try:
-                                    print(
-                                        f"Traitement partie: {game_data.get('uuid', 'unknown')}"
-                                    )
                                     result = await self._process_chess_com_game(
-                                        user_id, game_data
+                                        user_id,
+                                        game_data,
                                     )
                                     if result == "imported":
                                         imported += 1
-                                        print(f"Partie importée avec succès")
                                     else:
                                         skipped += 1
-                                        print(f"Partie ignorée: {result}")
                                 except Exception as e:
-                                    error_msg = f"Erreur game {game_data.get('uuid', 'unknown')}: {str(e)}"
-                                    print(f"ERREUR: {error_msg}")
+                                    error_msg = f"Erreur game {game_data.get('uuid', 'unknown')}: {e!s}"
                                     errors.append(error_msg)
                         else:
                             error_msg = f"Erreur API Chess.com {response.status} pour {year}/{month}"
-                            print(f"ERREUR: {error_msg}")
                             errors.append(error_msg)
 
                 except Exception as e:
-                    error_msg = f"Erreur mois {year}/{month}: {str(e)}"
-                    print(f"ERREUR: {error_msg}")
+                    error_msg = f"Erreur mois {year}/{month}: {e!s}"
                     errors.append(error_msg)
 
-        print(
-            f"Résultat final: {imported} importées, {skipped} ignorées, {len(errors)} erreurs"
-        )
         return {"imported": imported, "skipped": skipped, "errors": errors}
 
     async def _process_chess_com_game(self, user_id: int, game_data: dict) -> str:
         """Traite une partie Chess.com"""
         try:
             game_id = game_data.get("uuid")
-            print(f"Processing game {game_id}")
 
             # Vérifier si la partie existe déjà
             existing = (
@@ -122,23 +100,20 @@ class ChessImportService:
             )
 
             if existing:
-                print(f"Partie {game_id} déjà existante")
                 return "skipped"
 
             # Récupérer les usernames
             white_username = game_data["white"]["username"]
             black_username = game_data["black"]["username"]
-            print(f"White: {white_username}, Black: {black_username}")
 
             # Récupérer ou créer les profils de joueurs
             white_player = self._get_or_create_player_profile(
-                white_username, "chess.com"
+                white_username,
+                "chess.com",
             )
             black_player = self._get_or_create_player_profile(
-                black_username, "chess.com"
-            )
-            print(
-                f"Players créés - White ID: {white_player.id}, Black ID: {black_player.id}"
+                black_username,
+                "chess.com",
             )
 
             # Parser le PGN pour extraire les infos
@@ -149,7 +124,6 @@ class ChessImportService:
             white_result = game_data["white"].get("result")
             black_result = game_data["black"].get("result")
             result, winner = self._determine_game_result(white_result, black_result)
-            print(f"Résultat: {result}, Winner: {winner}")
 
             # Créer l'objet ChessGame
             chess_game = ChessGame(
@@ -157,18 +131,24 @@ class ChessImportService:
                 chess_com_url=game_data.get("url"),
                 white_player_id=white_player.id,
                 black_player_id=black_player.id,
+                white_player_rating=game_data["white"].get("rating"),
+                black_player_rating=game_data["black"].get("rating"),
                 owner_id=user_id,
                 game_date=datetime.fromtimestamp(
-                    game_data.get("end_time", 0), tz=timezone.utc
+                    game_data.get("end_time", 0),
+                    tz=UTC,
                 ),
                 time_control=game_data.get("time_control"),
                 time_class=game_data.get("time_class"),
                 rules=game_data.get("rules", "chess"),
                 rated=game_data.get("rated", True),
                 result=result,
-                termination=white_result
-                if white_result in ["checkmated", "resigned", "timeout", "abandoned"]
-                else black_result,
+                termination=(
+                    white_result
+                    if white_result
+                    in ["checkmated", "resigned", "timeout", "abandoned"]
+                    else black_result
+                ),
                 winner=winner,
                 pgn=pgn_text,
                 fen_final=game_info.get("fen_final"),
@@ -179,20 +159,20 @@ class ChessImportService:
 
             self.db.add(chess_game)
             self.db.commit()
-            print(f"Partie {game_id} sauvegardée avec succès")
 
             return "imported"
 
         except Exception as e:
-            print(f"Erreur dans _process_chess_com_game: {str(e)}")
+            print(f"Erreur dans _process_chess_com_game: {e!s}")
             self.db.rollback()
             raise e
 
     def _get_or_create_player_profile(
-        self, username: str, platform: str
+        self,
+        username: str,
+        platform: str,
     ) -> PlayerProfile:
         """Récupère ou crée un profil de joueur"""
-        print(f"Recherche/création player: {username} sur {platform}")
 
         try:
             # Chercher d'abord par le username de la plateforme
@@ -204,7 +184,6 @@ class ChessImportService:
             )
 
             if not player:
-                print(f"Création nouveau PlayerProfile pour {username}")
                 # Créer un nouveau profil de joueur
                 player_data = {
                     "username": username,
@@ -214,14 +193,10 @@ class ChessImportService:
                 player = PlayerProfile(**player_data)
                 self.db.add(player)
                 self.db.flush()  # Pour obtenir l'ID
-                print(f"PlayerProfile créé avec ID: {player.id}")
-            else:
-                print(f"PlayerProfile existant trouvé avec ID: {player.id}")
 
             return player
 
         except Exception as e:
-            print(f"Erreur dans _get_or_create_player_profile: {str(e)}")
             self.db.rollback()
             raise e
 
@@ -252,19 +227,23 @@ class ChessImportService:
         return info
 
     def _determine_game_result(
-        self, white_result: str, black_result: str
+        self,
+        white_result: str,
+        black_result: str,
     ) -> tuple[str, Optional[str]]:
         """Détermine le résultat de la partie et le gagnant"""
         if white_result == "win":
             return "1-0", "white"
-        elif black_result == "win":
+        if black_result == "win":
             return "0-1", "black"
-        else:
-            # Match nul (agreed, repetition, stalemate, timevsinsufficient, etc.)
-            return "1/2-1/2", None
+        # Match nul (agreed, repetition, stalemate, timevsinsufficient, etc.)
+        return "1/2-1/2", None
 
     async def _import_lichess_games(
-        self, user_id: int, username: str, months_back: int
+        self,
+        user_id: int,
+        username: str,
+        months_back: int,
     ) -> dict:
         """Import depuis Lichess"""
         imported = 0
@@ -277,7 +256,8 @@ class ChessImportService:
             try:
                 # Calculer la date de début
                 since_timestamp = int(
-                    (datetime.now().timestamp() - (months_back * 30 * 24 * 3600)) * 1000
+                    (datetime.now().timestamp() - (months_back * 30 * 24 * 3600))
+                    * 1000,
                 )
 
                 url = f"{self.lichess_api}/games/user/{username}"
@@ -304,17 +284,18 @@ class ChessImportService:
                             if line.strip():
                                 try:
                                     game_data = json.loads(
-                                        line
+                                        line,
                                     )  # Correction: json.loads au lieu d'eval
                                     result = await self._process_lichess_game(
-                                        user_id, game_data
+                                        user_id,
+                                        game_data,
                                     )
                                     if result == "imported":
                                         imported += 1
                                     else:
                                         skipped += 1
                                 except Exception as e:
-                                    error_msg = f"Erreur game: {str(e)}"
+                                    error_msg = f"Erreur game: {e!s}"
                                     print(f"ERREUR: {error_msg}")
                                     errors.append(error_msg)
                     else:
@@ -323,12 +304,12 @@ class ChessImportService:
                         errors.append(error_msg)
 
             except Exception as e:
-                error_msg = f"Erreur Lichess API: {str(e)}"
+                error_msg = f"Erreur Lichess API: {e!s}"
                 print(f"ERREUR: {error_msg}")
                 errors.append(error_msg)
 
         print(
-            f"Résultat Lichess: {imported} importées, {skipped} ignorées, {len(errors)} erreurs"
+            f"Résultat Lichess: {imported} importées, {skipped} ignorées, {len(errors)} erreurs",
         )
         return {"imported": imported, "skipped": skipped, "errors": errors}
 
@@ -370,7 +351,7 @@ class ChessImportService:
                 else None
             )
             time_class = self._get_lichess_time_class(
-                clock.get("initial", 0) if clock else 0
+                clock.get("initial", 0) if clock else 0,
             )
 
             # Construire le PGN
@@ -395,7 +376,8 @@ class ChessImportService:
                 black_player_id=black_player.id,
                 owner_id=user_id,
                 game_date=datetime.fromtimestamp(
-                    game_data.get("createdAt", 0) / 1000, tz=timezone.utc
+                    game_data.get("createdAt", 0) / 1000,
+                    tz=UTC,
                 ),
                 time_control=time_control,
                 time_class=time_class,
@@ -420,7 +402,7 @@ class ChessImportService:
             return "imported"
 
         except Exception as e:
-            print(f"Erreur dans _process_lichess_game: {str(e)}")
+            print(f"Erreur dans _process_lichess_game: {e!s}")
             self.db.rollback()
             raise e
 
@@ -428,12 +410,11 @@ class ChessImportService:
         """Détermine la classe de temps basée sur le temps initial (en secondes)"""
         if initial_time < 180:
             return "bullet"
-        elif initial_time < 600:
+        if initial_time < 600:
             return "blitz"
-        elif initial_time < 1800:
+        if initial_time < 1800:
             return "rapid"
-        else:
-            return "classical"
+        return "classical"
 
     def _build_lichess_pgn(self, game_data: dict, moves: str) -> str:
         """Construit un PGN basique à partir des données Lichess"""
@@ -445,7 +426,7 @@ class ChessImportService:
 
         # En-têtes PGN
         pgn_lines = [
-            f'[Event "Lichess game"]',
+            '[Event "Lichess game"]',
             f'[Site "https://lichess.org/{game_data.get("id")}"]',
             f'[Date "{date.strftime("%Y.%m.%d")}"]',
             f'[White "{white_name}"]',
@@ -463,7 +444,6 @@ class ChessImportService:
         winner = game_data.get("winner")
         if winner == "white":
             return "1-0"
-        elif winner == "black":
+        if winner == "black":
             return "0-1"
-        else:
-            return "1/2-1/2"
+        return "1/2-1/2"

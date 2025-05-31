@@ -1,17 +1,12 @@
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
     Integer,
     String,
-    Boolean,
-    DateTime,
-    Text,
-    Float,
-    ForeignKey,
-    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from .chess import ChessGame
 
 from app.db.database import Base
 

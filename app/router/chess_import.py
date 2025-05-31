@@ -1,18 +1,17 @@
 # Endpoint FastAPI
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-
-from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
-
 from typing import Annotated
 
-from app.services.chess_import_service import ChessImportService
-from app.db.models.chess import ChessGame
-from app.db.database import get_db
-from app.core.security import get_current_active_user
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api/chess", tags=["chess"])
+from app.core.security import get_current_active_user
+from app.db.database import get_db
+from app.db.models.chess import ChessGame
+from app.services.chess_import_service import ChessImportService
+
+router = APIRouter(prefix="/api/chess", tags=["chess_import"])
 
 db_dependency = Annotated[Session, Depends(get_db)]
 
@@ -49,7 +48,7 @@ async def import_user_games(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Erreur lors de l'import: {str(e)}"
+            status_code=500, detail=f"Erreur lors de l'import: {e!s}",
         )
 
 
@@ -69,7 +68,7 @@ async def get_user_games(
             or_(
                 ChessGame.white_player_id == current_user.id,
                 ChessGame.black_player_id == current_user.id,
-            )
+            ),
         )
         .order_by(ChessGame.game_date.desc())
         .offset(offset)

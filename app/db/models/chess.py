@@ -1,19 +1,18 @@
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
+    JSON,
     Boolean,
+    Column,
     DateTime,
-    Text,
     Float,
     ForeignKey,
-    JSON,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
-from .player_profil import PlayerProfile
 
 
 class ChessGame(Base):
@@ -29,6 +28,9 @@ class ChessGame(Base):
 
     white_player_id = Column(Integer, ForeignKey("player_profiles.id"), nullable=False)
     black_player_id = Column(Integer, ForeignKey("player_profiles.id"), nullable=False)
+
+    white_player_rating = Column(Integer, nullable=True)
+    black_player_rating = Column(Integer, nullable=True)
 
     white_player = relationship("PlayerProfile", foreign_keys=[white_player_id])
     black_player = relationship("PlayerProfile", foreign_keys=[black_player_id])
@@ -47,7 +49,7 @@ class ChessGame(Base):
     # Résultat
     result = Column(String(10), nullable=False)  # "1-0", "0-1", "1/2-1/2"
     termination = Column(
-        String(50), nullable=True
+        String(50), nullable=True,
     )  # "checkmated", "resigned", "timeout"
     winner = Column(String(10), nullable=True)  # "white", "black", or NULL for draw
 
@@ -102,16 +104,15 @@ class ChessGame(Base):
 
         if hours > 0:
             return f"{hours}h{minutes:02d}m{seconds:02d}s"
-        elif minutes > 0:
+        if minutes > 0:
             return f"{minutes}m{seconds:02d}s"
-        else:
-            return f"{seconds}s"
+        return f"{seconds}s"
 
     def get_opponent(self, user_id):
         """Retourne l'adversaire d'un utilisateur donné"""
         if self.white_player_id == user_id:
             return self.black_player
-        elif self.black_player_id == user_id:
+        if self.black_player_id == user_id:
             return self.white_player
         return None
 
@@ -119,7 +120,7 @@ class ChessGame(Base):
         """Retourne la couleur jouée par un utilisateur"""
         if self.white_player_id == user_id:
             return "white"
-        elif self.black_player_id == user_id:
+        if self.black_player_id == user_id:
             return "black"
         return None
 
@@ -138,7 +139,7 @@ class GamePosition(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     game_id = Column(
-        Integer, ForeignKey("chess_games.id", ondelete="CASCADE"), nullable=False
+        Integer, ForeignKey("chess_games.id", ondelete="CASCADE"), nullable=False,
     )
 
     # Relations
